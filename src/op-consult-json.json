@@ -1,0 +1,420 @@
+{
+  "resourceType": "Bundle",
+  "id": "Consultation-d10ce2d8-4e0c-48c6-90eb-7593e0cac2af",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2025-08-28T20:30:51.355+05:30",
+    "profile": [
+      "https://nrces.in/ndhm/fhir/r4/StructureDefinition/DocumentBundle"
+    ]
+  },
+  "identifier": {
+    "system": "http://hip.in",
+    "value": "dbdcc197-14bd-40aa-93ff-3485ce897818"
+  },
+  "type": "document",
+  "timestamp": "2025-08-28T20:30:51.355+05:30",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:d6a2ea04-2f23-43c6-93f7-353c219e7364",
+      "resource": {
+        "resourceType": "Composition",
+        "id": "d6a2ea04-2f23-43c6-93f7-353c219e7364",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/ConsultationRecord"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Consultation Note</h3><p>OP Consultation Note</p><p>Date: 2025-08-28</p></div>"
+        },
+        "language": "en-IN",
+        "identifier": {
+          "system": "https://ndhm.in/phr",
+          "value": "5cef16ee-e00e-4162-bfb9-cb63e965a7c2"
+        },
+        "status": "final",
+        "type": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "371530004",
+              "display": "Clinical consultation report"
+            }
+          ],
+          "text": "Clinical consultation report"
+        },
+        "subject": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        },
+        "date": "2025-08-28T00:00:00+05:30",
+        "author": [
+          {
+            "reference": "urn:uuid:df9f91c3-5c8b-4c13-a62e-f5576e0d9aba",
+            "display": "Dr. DEF"
+          }
+        ],
+        "title": "OP Consultation Note",
+        "section": [
+          {
+            "title": "Chief complaints",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "422843007",
+                  "display": "Chief complaint section"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:c35e5c18-e1bc-4eb5-bdf2-17689bee6e34",
+                "type": "Condition"
+              }
+            ]
+          },
+          {
+            "title": "Physical examination",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "425044008",
+                  "display": "Physical exam section"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:380e9fd6-1206-4e36-b5e9-ce024f983f93",
+                "type": "Observation"
+              }
+            ]
+          },
+          {
+            "title": "Allergies",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "722446000",
+                  "display": "Allergy record"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:65f3e581-4748-4834-bdc1-c9652fafc161",
+                "type": "AllergyIntolerance"
+              }
+            ]
+          },
+          {
+            "title": "Medications",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "721912009",
+                  "display": "Medication summary document"
+                }
+              ]
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:311bc2b9-733e-4ce7-929a-ad98eba6cae4",
+                "type": "MedicationStatement"
+              }
+            ]
+          },
+          {
+            "title": "History",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "371529009",
+                  "display": "History and physical report"
+                }
+              ]
+            },
+            "entry": [],
+            "text": {
+              "text": "Patient with episodic headaches."
+            }
+          },
+          {
+            "title": "Investigations / Advice",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "721963009",
+                  "display": "Order document"
+                }
+              ]
+            },
+            "entry": []
+          },
+          {
+            "title": "Plan",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "390906007",
+                  "display": "Follow-up encounter"
+                }
+              ]
+            },
+            "entry": []
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "238424c2-da43-41ee-92c6-05d4ab0447a7",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Patient</h3><p>ABC, DoB: 1985-04-12</p></div>"
+        },
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "MR",
+                  "display": "Medical record number"
+                }
+              ]
+            },
+            "system": "https://healthid.ndhm.gov.in",
+            "value": "MR-001-2025"
+          }
+        ],
+        "name": [
+          {
+            "text": "ABC"
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "+911234567890",
+            "use": "home"
+          }
+        ],
+        "gender": "male",
+        "birthDate": "1985-04-12"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:df9f91c3-5c8b-4c13-a62e-f5576e0d9aba",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "df9f91c3-5c8b-4c13-a62e-f5576e0d9aba",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Practitioner</h3><p>Dr. DEF</p></div>"
+        },
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "MD",
+                  "display": "Medical License number"
+                }
+              ]
+            },
+            "system": "https://doctor.ndhm.gov.in",
+            "value": "MD-12345-6789"
+          }
+        ],
+        "name": [
+          {
+            "text": "Dr. DEF"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c35e5c18-e1bc-4eb5-bdf2-17689bee6e34",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "c35e5c18-e1bc-4eb5-bdf2-17689bee6e34",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Condition"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Chief Complaint</h3><p>Headache for 3 days</p></div>"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active",
+              "display": "Active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "",
+              "display": "Headache for 3 days"
+            }
+          ],
+          "text": "Headache for 3 days"
+        },
+        "subject": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:380e9fd6-1206-4e36-b5e9-ce024f983f93",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "380e9fd6-1206-4e36-b5e9-ce024f983f93",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Examination</h3><p>BP: 150/90 mmHg</p></div>"
+        },
+        "status": "final",
+        "code": {
+          "text": "Physical examination"
+        },
+        "subject": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        },
+        "valueString": "BP: 150/90 mmHg"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:65f3e581-4748-4834-bdc1-c9652fafc161",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "65f3e581-4748-4834-bdc1-c9652fafc161",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/AllergyIntolerance"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Allergy</h3><p>None</p></div>"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active",
+              "display": "Active"
+            }
+          ]
+        },
+        "code": {
+          "text": "None"
+        },
+        "patient": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:311bc2b9-733e-4ce7-929a-ad98eba6cae4",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "311bc2b9-733e-4ce7-929a-ad98eba6cae4",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationStatement"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Medication</h3><p>Amlodipine 5 mg - Once daily</p></div>"
+        },
+        "status": "active",
+        "medicationCodeableConcept": {
+          "text": "Amlodipine 5 mg"
+        },
+        "subject": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        },
+        "note": "Once daily"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:e1e617ae-5e88-459c-87fb-bf31dbb9b900",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "e1e617ae-5e88-459c-87fb-bf31dbb9b900",
+        "meta": {
+          "profile": [
+            "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Condition"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h3>Diagnosis</h3><p>Hypertension</p></div>"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active",
+              "display": "Active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "38341003",
+              "display": "Hypertension"
+            }
+          ],
+          "text": "Hypertension"
+        },
+        "subject": {
+          "reference": "urn:uuid:238424c2-da43-41ee-92c6-05d4ab0447a7",
+          "display": "ABC"
+        }
+      }
+    }
+  ]
+}

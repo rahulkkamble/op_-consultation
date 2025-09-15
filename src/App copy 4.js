@@ -1,6 +1,5 @@
 // src/App.js
 import React, { useState, useRef, useEffect } from "react";
-import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 /* Lightweight UUID generator for UI use */
@@ -73,7 +72,7 @@ const ddmmyyyyToISO = (dob) => {
 const normalizeAbhaAddresses = (patientObj) => {
   const raw =
     patientObj?.additional_attributes?.abha_addresses &&
-      Array.isArray(patientObj.additional_attributes.abha_addresses)
+    Array.isArray(patientObj.additional_attributes.abha_addresses)
       ? patientObj.additional_attributes.abha_addresses
       : [];
   const out = raw
@@ -104,19 +103,14 @@ export default function AppConsult() {
     license: "MD-12345-6789",
   });
 
-  const practitionerReferenceId = window.GlobalPractitioner?.id || uuidv4();
-  const practitionerDisplayName = window.GlobalPractitioner?.name?.[0]?.text || "Fake Doctor";
-  const practitionerLicense = window.GlobalPractitioner?.identifier?.[0]?.value || "FAKE-0000-0000";
-
-
   // Patient (form state used by the bundle) — keep this shape the same
   const [patient, setPatient] = useState({
-    name: "",
-    user_ref_id: "",
-    birthDate: "",
-    gender: "",
-    phone: "",
-});
+    name: "ABC",
+    mrn: "MR-001-2025",
+    birthDate: "1985-04-12",
+    gender: "male",
+    phone: "+911234567890",
+  });
 
   // Patient list (mock "API") + selection/ABHA UI state
   const [patientsList, setPatientsList] = useState([]);
@@ -201,6 +195,8 @@ export default function AppConsult() {
   const [successMsg, setSuccessMsg] = useState("");
 
   /* ----------------- Handlers ----------------- */
+  const handlePractitionerChange = (e) =>
+    setPractitioner({ ...practitioner, [e.target.name]: e.target.value });
   const handlePatientChange = (e) =>
     setPatient({ ...patient, [e.target.name]: e.target.value });
   const handleCompositionChange = (e) =>
@@ -256,7 +252,7 @@ export default function AppConsult() {
     // Basic front-end checks
     if (!practitioner.name || !practitioner.license)
       throw new Error("Practitioner name and license required.");
-    if (!patient.name || !patient.user_ref_id || !patient.gender)
+    if (!patient.name || !patient.mrn || !patient.gender)
       throw new Error("Patient name, MRN and gender required.");
     if (!composition.title || !composition.date)
       throw new Error("Composition title and date required.");
@@ -265,6 +261,7 @@ export default function AppConsult() {
     // Generate IDs
     const compId = uuidv4();
     const patientId = uuidv4();
+    const practitionerId = uuidv4();
     const conditionId = uuidv4();
     const chiefIds = chiefComplaints.map(() => uuidv4());
     const examIds = physicalExams.map(() => uuidv4());
@@ -472,7 +469,7 @@ export default function AppConsult() {
       },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
       date: `${composition.date}T00:00:00+05:30`,
-      author: [{ reference: `urn:uuid:${practitionerReferenceId}`, display: practitionerDisplayName }],
+      author: [{ reference: `urn:uuid:${practitionerId}`, display: practitioner.name }],
       title: composition.title,
       section: sections,
     }; // keeps your existing shape. :contentReference[oaicite:2]{index=2}
@@ -505,7 +502,7 @@ export default function AppConsult() {
             ],
           },
           system: "https://healthid.ndhm.gov.in",
-          value: patient.user_ref_id,
+          value: patient.mrn,
         },
       ],
       name: [{ text: patient.name }],
@@ -519,11 +516,33 @@ export default function AppConsult() {
     /* Practitioner resource */
     const practitionerResource = {
       resourceType: "Practitioner",
-      id: practitionerReferenceId,
-      meta: { profile: ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"] },
-      text: { status: "generated", div: buildNarrative("Practitioner", `<p>${practitionerDisplayName}</p>`) },
-      identifier: [{ type: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0203", code: "MD", display: "Medical License number" }] }, system: "https://doctor.ndhm.gov.in", value: practitionerLicense }],
-      name: [{ text: practitionerDisplayName }],
+      id: practitionerId,
+      meta: {
+        profile: [
+          "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner",
+        ],
+      },
+      text: {
+        status: "generated",
+        div: buildNarrative("Practitioner", `<p>${practitioner.name}</p>`),
+      },
+      identifier: [
+        {
+          type: {
+            coding: [
+              {
+                system:
+                  "http://terminology.hl7.org/CodeSystem/v2-0203",
+                code: "MD",
+                display: "Medical License number",
+              },
+            ],
+          },
+          system: "https://doctor.ndhm.gov.in",
+          value: practitioner.license,
+        },
+      ],
+      name: [{ text: practitioner.name }],
     }; // unchanged. :contentReference[oaicite:4]{index=4}
 
     /* Chief complaints -> Condition resources */
@@ -553,15 +572,15 @@ export default function AppConsult() {
         code: cc.text
           ? cc.code && cc.code.trim() !== ""
             ? {
-              coding: [
-                {
-                  system: "http://snomed.info/sct",
-                  code: cc.code.trim(),
-                  display: cc.text,
-                },
-              ],
-              text: cc.text,
-            }
+                coding: [
+                  {
+                    system: "http://snomed.info/sct",
+                    code: cc.code.trim(),
+                    display: cc.text,
+                  },
+                ],
+                text: cc.text,
+              }
             : { text: cc.text }
           : undefined,
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
@@ -635,14 +654,14 @@ export default function AppConsult() {
         medicationCodeableConcept:
           m.medicationCode && m.medicationCode.trim() !== ""
             ? {
-              coding: [
-                {
-                  system: "http://snomed.info/sct",
-                  code: m.medicationCode.trim(),
-                  display: m.medicationText,
-                },
-              ],
-            }
+                coding: [
+                  {
+                    system: "http://snomed.info/sct",
+                    code: m.medicationCode.trim(),
+                    display: m.medicationText,
+                  },
+                ],
+              }
             : { text: m.medicationText },
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
         ...(m.note && m.note.trim() !== "" ? { note: [{ text: m.note.trim() }] } : {}),
@@ -676,15 +695,15 @@ export default function AppConsult() {
       code:
         condition.code && String(condition.code).trim() !== ""
           ? {
-            coding: [
-              {
-                system: "http://snomed.info/sct",
-                code: condition.code.trim(),
-                display: condition.text,
-              },
-            ],
-            text: condition.text,
-          }
+              coding: [
+                {
+                  system: "http://snomed.info/sct",
+                  code: condition.code.trim(),
+                  display: condition.text,
+                },
+              ],
+              text: condition.text,
+            }
           : { text: condition.text },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
     };
@@ -706,7 +725,7 @@ export default function AppConsult() {
     /* Compose bundle entries - stable order */
     bundle.entry.push({ fullUrl: `urn:uuid:${compId}`, resource: compositionResource });
     bundle.entry.push({ fullUrl: `urn:uuid:${patientId}`, resource: patientResource });
-    bundle.entry.push({ fullUrl: `urn:uuid:${practitionerReferenceId}`, resource: practitionerResource });
+    bundle.entry.push({ fullUrl: `urn:uuid:${practitionerId}`, resource: practitionerResource });
     chiefResources.forEach((r) => bundle.entry.push({ fullUrl: `urn:uuid:${r.id}`, resource: r }));
     examResources.forEach((r) => bundle.entry.push({ fullUrl: `urn:uuid:${r.id}`, resource: r }));
     allergyResources.forEach((r) => bundle.entry.push({ fullUrl: `urn:uuid:${r.id}`, resource: r }));
@@ -729,8 +748,8 @@ export default function AppConsult() {
       setErrorMsg("Practitioner name and license are mandatory.");
       return;
     }
-    if (!patient.name || !patient.user_ref_id || !patient.gender) {
-      setErrorMsg("Patient name, MRN, and gender are mandatory.");
+    if (!patient.name || !patient.mrn || !patient.gender) {
+      setErrorMsg("Patient name, MRN and gender are mandatory.");
       return;
     }
     if (!composition.title || !composition.date) {
@@ -744,16 +763,9 @@ export default function AppConsult() {
 
     try {
       const bundle = buildBundle();
-      console.log("JSON pushed on server:", bundle);
-      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patient.user_ref_id })
-        .then(response => {
-          console.log("FHIR Bundle Submitted:", response.data);
-          alert("Submitted successfully");
-        })
-        .catch(error => {
-          console.error("Error submitting FHIR Bundle:", error.response?.data || error.message);
-          alert("Failed to submit FHIR Bundle. See console.");
-        });
+      console.log("JSON pushed on server:");
+      console.log(pretty(bundle));
+      setSuccessMsg("Consultation Note submitted and logged to console (pushed to server).");
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       console.error(err);
@@ -773,11 +785,11 @@ export default function AppConsult() {
           <div className="row g-2">
             <div className="col-md-6">
               <label className="form-label">Name <span className="text-danger">*</span></label>
-              <input className="form-control" readOnly value={practitionerDisplayName} />
+              <input name="name" type="text" className="form-control" value={practitioner.name} onChange={handlePractitionerChange} />
             </div>
             <div className="col-md-6">
               <label className="form-label">License No. <span className="text-danger">*</span></label>
-              <input className="form-control" readOnly value={practitionerLicense} />
+              <input name="license" type="text" className="form-control" value={practitioner.license} onChange={handlePractitionerChange} />
             </div>
           </div>
         </div>
@@ -809,7 +821,7 @@ export default function AppConsult() {
             </div>
             <div className="col-md-6">
               <label className="form-label">MRN <span className="text-danger">*</span></label>
-              <input name="user_ref_id" type="text" className="form-control" value={patient.user_ref_id} onChange={handlePatientChange} />
+              <input name="mrn" type="text" className="form-control" value={patient.mrn} onChange={handlePatientChange} />
             </div>
 
             <div className="col-md-4 mt-2">

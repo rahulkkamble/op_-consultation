@@ -73,7 +73,7 @@ const ddmmyyyyToISO = (dob) => {
 const normalizeAbhaAddresses = (patientObj) => {
   const raw =
     patientObj?.additional_attributes?.abha_addresses &&
-    Array.isArray(patientObj.additional_attributes.abha_addresses)
+      Array.isArray(patientObj.additional_attributes.abha_addresses)
       ? patientObj.additional_attributes.abha_addresses
       : [];
   const out = raw
@@ -108,15 +108,15 @@ export default function AppConsult() {
   const practitionerDisplayName = window.GlobalPractitioner?.name?.[0]?.text || "Doctor ABC";
   const practitionerLicense = window.GlobalPractitioner?.identifier?.[0]?.value || "ABC-0000-0000";
 
+
   // Patient (form state used by the bundle) — keep this shape the same
   const [patient, setPatient] = useState({
     name: "",
-    user_ref_id: "",  // MRN (added for validator-safe identifier)
     user_id: "",
     birthDate: "",
     gender: "",
     phone: "",
-  });
+});
 
   // Patient list (mock "API") + selection/ABHA UI state
   const [patientsList, setPatientsList] = useState([]);
@@ -156,7 +156,6 @@ export default function AppConsult() {
       phone: p.mobile ? (String(p.mobile).startsWith("+") ? String(p.mobile) : `+91${p.mobile}`) : "",
       gender: mapGender(p.gender),
       birthDate: ddmmyyyyToISO(p.dob),
-      user_ref_id: p.user_ref_id || p.user_id || "",
     }));
     // ABHA UI
     const abhas = normalizeAbhaAddresses(p);
@@ -476,10 +475,9 @@ export default function AppConsult() {
       author: [{ reference: `urn:uuid:${practitionerReferenceId}`, display: practitionerDisplayName }],
       title: composition.title,
       section: sections,
-    }; // keeps your existing shape.
+    }; // keeps your existing shape. :contentReference[oaicite:2]{index=2}
 
     /* Patient resource */
-    const mrnValue = patient.user_ref_id || patient.user_id; // MRN preferred; fallback to user_id
     const patientResource = {
       resourceType: "Patient",
       id: patientId,
@@ -507,7 +505,7 @@ export default function AppConsult() {
             ],
           },
           system: "https://healthid.ndhm.gov.in",
-          value: mrnValue, // fixed: ensures non-empty value for validator
+          value: patient.user_id,
         },
       ],
       name: [{ text: patient.name }],
@@ -516,7 +514,7 @@ export default function AppConsult() {
         : [],
       gender: patient.gender,
       birthDate: patient.birthDate || undefined,
-    };
+    }; // unchanged from your file. :contentReference[oaicite:3]{index=3}
 
     /* Practitioner resource */
     const practitionerResource = {
@@ -526,7 +524,7 @@ export default function AppConsult() {
       // text: { status: "generated", div: buildNarrative("Practitioner", `<p>${practitionerDisplayName}</p>`) },
       identifier: [{ type: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0203", code: "MD", display: "Medical License number" }] }, system: "https://doctor.ndhm.gov.in", value: practitionerLicense }],
       name: [{ text: practitionerDisplayName }],
-    };
+    }; // unchanged. :contentReference[oaicite:4]{index=4}
 
     /* Chief complaints -> Condition resources */
     const chiefResources = chiefComplaints.map((cc, idx) => {
@@ -538,6 +536,10 @@ export default function AppConsult() {
             "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Condition",
           ],
         },
+        // text: {
+        //   status: "generated",
+        //   div: buildNarrative("Chief Complaint", `<p>${cc.text}</p>`),
+        // },
         clinicalStatus: {
           coding: [
             {
@@ -551,15 +553,15 @@ export default function AppConsult() {
         code: cc.text
           ? cc.code && cc.code.trim() !== ""
             ? {
-                coding: [
-                  {
-                    system: "http://snomed.info/sct",
-                    code: cc.code.trim(),
-                    display: cc.text,
-                  },
-                ],
-                text: cc.text,
-              }
+              coding: [
+                {
+                  system: "http://snomed.info/sct",
+                  code: cc.code.trim(),
+                  display: cc.text,
+                },
+              ],
+              text: cc.text,
+            }
             : { text: cc.text }
           : undefined,
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
@@ -575,6 +577,10 @@ export default function AppConsult() {
           "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Observation",
         ],
       },
+      // text: {
+      //   status: "generated",
+      //   div: buildNarrative("Examination", `<p>${ex.text}</p>`),
+      // },
       status: "final",
       code: { text: "Physical examination" },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
@@ -590,6 +596,10 @@ export default function AppConsult() {
           "https://nrces.in/ndhm/fhir/r4/StructureDefinition/AllergyIntolerance",
         ],
       },
+      // text: {
+      //   status: "generated",
+      //   div: buildNarrative("Allergy", `<p>${a.text}</p>`),
+      // },
       clinicalStatus: {
         coding: [
           {
@@ -602,7 +612,7 @@ export default function AppConsult() {
       },
       code: a.text ? { text: a.text } : undefined,
       patient: { reference: `urn:uuid:${patientId}`, display: patient.name },
-    }));
+    })); // unchanged. :contentReference[oaicite:5]{index=5}
 
     /* MedicationStatement resources */
     const medResources = medications.map((m, idx) => {
@@ -625,20 +635,20 @@ export default function AppConsult() {
         medicationCodeableConcept:
           m.medicationCode && m.medicationCode.trim() !== ""
             ? {
-                coding: [
-                  {
-                    system: "http://snomed.info/sct",
-                    code: m.medicationCode.trim(),
-                    display: m.medicationText,
-                  },
-                ],
-              }
+              coding: [
+                {
+                  system: "http://snomed.info/sct",
+                  code: m.medicationCode.trim(),
+                  display: m.medicationText,
+                },
+              ],
+            }
             : { text: m.medicationText },
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
         ...(m.note && m.note.trim() !== "" ? { note: [{ text: m.note.trim() }] } : {}),
       };
       return medObj;
-    });
+    }); // unchanged. :contentReference[oaicite:6]{index=6}
 
     /* Primary diagnosis (Condition) */
     const conditionResource = {
@@ -649,6 +659,10 @@ export default function AppConsult() {
           "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Condition",
         ],
       },
+      // text: {
+      //   status: "generated",
+      //   div: buildNarrative("Diagnosis", `<p>${condition.text}</p>`),
+      // },
       clinicalStatus: {
         coding: [
           {
@@ -662,15 +676,15 @@ export default function AppConsult() {
       code:
         condition.code && String(condition.code).trim() !== ""
           ? {
-              coding: [
-                {
-                  system: "http://snomed.info/sct",
-                  code: condition.code.trim(),
-                  display: condition.text,
-                },
-              ],
-              text: condition.text,
-            }
+            coding: [
+              {
+                system: "http://snomed.info/sct",
+                code: condition.code.trim(),
+                display: condition.text,
+              },
+            ],
+            text: condition.text,
+          }
           : { text: condition.text },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
     };
@@ -731,14 +745,13 @@ export default function AppConsult() {
     try {
       const bundle = buildBundle();
       console.log("JSON pushed on server:", bundle);
-      const patientForPost = patient.user_ref_id || patient.user_id; // MRN preferred; fallback to user_id
-      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patientForPost })
+      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patient.id })
         .then(response => {
           console.log("FHIR Bundle Submitted:", response.data);
           alert("Submitted successfully");
         })
         .catch(error => {
-          console.error("Error submitting FHIR Bundle:", error.response?.data || error.message, { patient: patientForPost });
+          console.error("Error submitting FHIR Bundle:", error.response?.data || error.message, {patient: patient.id });
           alert("Failed to submit FHIR Bundle. See console.");
         });
       setTimeout(() => setSuccessMsg(""), 4000);
@@ -792,20 +805,20 @@ export default function AppConsult() {
           <div className="row g-2">
             <div className="col-md-6">
               <label className="form-label">Full Name <span className="text-danger">*</span></label>
-              <input name="name" type="text" className="form-control" value={patient.name} readOnly />
+              <input name="name" type="text" className="form-control" value={patient.name} onChange={handlePatientChange} />
             </div>
             <div className="col-md-6">
               <label className="form-label">MRN <span className="text-danger">*</span></label>
-              <input name="user_ref_id" type="text" className="form-control" value={patient.user_ref_id} readOnly  />
+              <input name="user_ref_id" type="text" className="form-control" value={patient.user_ref_id} onChange={handlePatientChange} />
             </div>
 
             <div className="col-md-4 mt-2">
               <label className="form-label">Phone</label>
-              <input name="phone" type="tel" className="form-control" value={patient.phone} readOnly />
+              <input name="phone" type="tel" className="form-control" value={patient.phone} onChange={handlePatientChange} />
             </div>
             <div className="col-md-4 mt-2">
               <label className="form-label">Gender <span className="text-danger">*</span></label>
-              <select name="gender" className="form-select" value={patient.gender} readOnly >
+              <select name="gender" className="form-select" value={patient.gender} onChange={handlePatientChange}>
                 <option value="">--Select--</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -815,7 +828,7 @@ export default function AppConsult() {
             </div>
             <div className="col-md-4 mt-2">
               <label className="form-label">Birth Date</label>
-              <input name="birthDate" type="date" className="form-control" value={patient.birthDate} readOnly  />
+              <input name="birthDate" type="date" className="form-control" value={patient.birthDate} onChange={handlePatientChange} />
             </div>
 
             {/* ABHA UI (not used in bundle; for operator convenience) */}

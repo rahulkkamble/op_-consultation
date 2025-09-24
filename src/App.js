@@ -112,6 +112,7 @@ export default function AppConsult() {
   // Patient (form state used by the bundle) — keep this shape the same
   const [patient, setPatient] = useState({
     name: "",
+    id: "",
     user_ref_id: "",
     birthDate: "",
     gender: "",
@@ -132,6 +133,7 @@ export default function AppConsult() {
         const res = await fetch("/patients.json");
         const data = await res.json();
         setPatientsList(Array.isArray(data) ? data : []);
+        console.log(patient)
       } catch (e) {
         console.error("Failed to load patients.json", e);
       }
@@ -745,7 +747,7 @@ export default function AppConsult() {
     try {
       const bundle = buildBundle();
       console.log("JSON pushed on server:", bundle);
-      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patient.user_ref_id })
+      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patient.id })
         .then(response => {
           console.log("FHIR Bundle Submitted:", response.data);
           alert("Submitted successfully");

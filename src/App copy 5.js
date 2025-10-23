@@ -3,8 +3,6 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-/* ---------------------------- Utilities ---------------------------- */
-
 /* Lightweight UUID generator for UI use */
 function uuidv4() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
@@ -38,6 +36,7 @@ function getISOWithOffsetFromDateInput(dateInput /* optional 'YYYY-MM-DD' */) {
 
 /* Minimal XHTML narrative wrapper */
 function buildNarrative(title, html) {
+  // Keep as-is to avoid changing existing bundle output
   return `<div xmlns="http://www.w3.org/1999/xhtml" lang="en-IN" xml:lang="en-IN"><h3>${title}</h3>${html}</div>`;
 }
 
@@ -51,9 +50,12 @@ function makeSectionNarrative(title, rawText) {
   };
 }
 
+/* Pretty JSON */
+const pretty = (o) => JSON.stringify(o, null, 2);
+
 /* Helpers for patient JSON mapping */
 const mapGender = (g) => {
-  if (!g) return "unknown";
+  if (!g) return "";
   const t = String(g).toLowerCase();
   if (t.startsWith("male")) return "male";
   if (t.startsWith("female")) return "female";
@@ -62,44 +64,30 @@ const mapGender = (g) => {
 };
 const ddmmyyyyToISO = (dob) => {
   if (!dob) return "";
-  const s = String(dob).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // already ISO date
-  const parts = s.split("-");
+  const parts = String(dob).split("-");
   if (parts.length !== 3) return "";
   const [dd, mm, yyyy] = parts;
   if (!yyyy || !mm || !dd) return "";
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 };
-
-/* Normalize ABHA addresses from your API shape (strings or objects with 'address' and 'isPrimary') */
 const normalizeAbhaAddresses = (patientObj) => {
   const raw =
     patientObj?.additional_attributes?.abha_addresses &&
     Array.isArray(patientObj.additional_attributes.abha_addresses)
       ? patientObj.additional_attributes.abha_addresses
-      : Array.isArray(patientObj?.abha_addresses)
-        ? patientObj.abha_addresses
-        : [];
+      : [];
   const out = raw
     .map((item) => {
       if (!item) return null;
       if (typeof item === "string") {
         return { value: item, label: item, primary: false };
       }
-      if (typeof item === "object") {
-        if (item.address) {
-          return {
-            value: String(item.address),
-            label: item.isPrimary ? `${item.address} (primary)` : String(item.address),
-            primary: !!item.isPrimary,
-          };
-        }
-        try {
-          const v = JSON.stringify(item);
-          return { value: v, label: v, primary: !!item.isPrimary };
-        } catch {
-          return null;
-        }
+      if (typeof item === "object" && item.address) {
+        return {
+          value: String(item.address),
+          label: item.isPrimary ? `${item.address} (primary)` : String(item.address),
+          primary: !!item.isPrimary,
+        };
       }
       return null;
     })
@@ -109,134 +97,49 @@ const normalizeAbhaAddresses = (patientObj) => {
   return out;
 };
 
-/* Resolve practitioner from global window object with safe fallbacks */
-function resolveGlobalPractitioner() {
-  const gp = (typeof window !== "undefined" && (window.GlobalPractitionerFHIR || window.GlobalPractitioner)) || null;
-  const fallback = {
-    id: `TEMP-${uuidv4()}`,
-    name: "Doctor ABC",
-    license: "ABC-0000-0000",
-  };
-  if (!gp) return fallback;
-  if (typeof gp === "object" && gp.name && typeof gp.name === "string") {
-    return {
-      id: gp.id || fallback.id,
-      name: gp.name || fallback.name,
-      license: gp.license || fallback.license,
-    };
-  }
-  const id = gp.id || fallback.id;
-  const name = (Array.isArray(gp.name) && gp.name[0] && gp.name[0].text) || fallback.name;
-  const license =
-    (Array.isArray(gp.identifier) && gp.identifier[0] && gp.identifier[0].value) || fallback.license;
-  return { id, name, license };
-}
-
-/* ---------------------------- Component ---------------------------- */
-
 export default function AppConsult() {
   // Practitioner (author)
-  const [practitioner, setPractitioner] = useState(resolveGlobalPractitioner());
-  const practitionerReferenceId = practitioner.id;
-  const practitionerDisplayName = practitioner.name;
-  const practitionerLicense = practitioner.license;
+  const [practitioner, setPractitioner] = useState({
+    name: "Dr. DEF",
+    license: "MD-12345-6789",
+  });
 
-  // Patient (form state used by the bundle)
+  const practitionerReferenceId = window.GlobalPractitioner?.id || uuidv4();
+  const practitionerDisplayName = window.GlobalPractitioner?.name?.[0]?.text || "Doctor ABC";
+  const practitionerLicense = window.GlobalPractitioner?.identifier?.[0]?.value || "ABC-0000-0000";
+
+  // Patient (form state used by the bundle) — keep this shape the same
   const [patient, setPatient] = useState({
     name: "",
-    user_ref_id: "",
+    user_ref_id: "",  // MRN (added for validator-safe identifier)
     user_id: "",
     birthDate: "",
     gender: "",
     phone: "",
   });
 
-  // Patient list + selection/ABHA UI state
+  // Patient list (mock "API") + selection/ABHA UI state
   const [patientsList, setPatientsList] = useState([]);
   const [selectedPatientIdx, setSelectedPatientIdx] = useState(-1);
   const [abhaList, setAbhaList] = useState([]);
   const [selectedAbha, setSelectedAbha] = useState("");
   const [selectedAbhaNumber, setSelectedAbhaNumber] = useState(""); // abha_ref, read-only display
 
-  /* ---------- Fetch patients: try API first (/api/v5/patients), fallback to local (/patients.json) ---------- */
   useEffect(() => {
+    // Load mock patients from /public/patients.json
     (async () => {
       try {
-        const apiRes = await fetch("/api/v5/patients", {
-          headers: {
-            "Content-Type": "application/json",
-            ...(window.GlobalAuthToken ? { "Authorization": `Bearer ${window.GlobalAuthToken}` } : {}),
-          },
-        });
-        if (!apiRes.ok) throw new Error("API fetch failed");
-        const apiData = await apiRes.json();
-        if (!Array.isArray(apiData) || apiData.length === 0) throw new Error("API returned empty");
-
-        setPatientsList(apiData);
-        setSelectedPatientIdx(0);
-        const p = apiData[0];
-        const derivedMrn = p.user_ref_id || p.mrn || p.abha_ref || String(p.user_id || "");
-        const phone = p.mobile
-          ? String(p.mobile).startsWith("+") ? String(p.mobile) : `+91${p.mobile}`
-          : p.phone || "";
-        setPatient({
-          name: p.name || "",
-          user_ref_id: derivedMrn,
-          user_id: String(p.user_id || ""),
-          birthDate: ddmmyyyyToISO(p.dob || p.birthDate || ""),
-          gender: mapGender(p.gender),
-          phone,
-        });
-        const abhas = normalizeAbhaAddresses(p);
-        setAbhaList(abhas);
-        setSelectedAbha(abhas.length ? abhas[0].value : "");
-        setSelectedAbhaNumber(p.abha_ref || "");
-      } catch (apiErr) {
-        console.warn("API fetch failed, falling back to local patients.json", apiErr);
-        try {
-          const localRes = await fetch("/patients.json");
-          const localData = await localRes.json();
-          const arr = Array.isArray(localData) ? localData : [];
-          setPatientsList(arr);
-          if (arr.length > 0) {
-            setSelectedPatientIdx(0);
-            const p = arr[0];
-            const derivedMrn = p.user_ref_id || p.mrn || p.abha_ref || String(p.user_id || "");
-            const phone = p.mobile
-              ? String(p.mobile).startsWith("+") ? String(p.mobile) : `+91${p.mobile}`
-              : p.phone || "";
-            setPatient({
-              name: p.name || "",
-              user_ref_id: derivedMrn,
-              user_id: String(p.user_id || ""),
-              birthDate: ddmmyyyyToISO(p.dob || p.birthDate || ""),
-              gender: mapGender(p.gender),
-              phone,
-            });
-            const abhas = normalizeAbhaAddresses(p);
-            setAbhaList(abhas);
-            setSelectedAbha(abhas.length ? abhas[0].value : "");
-            setSelectedAbhaNumber(p.abha_ref || "");
-          }
-        } catch (localErr) {
-          console.error("Failed to fetch local patients.json:", localErr);
-        }
+        const res = await fetch("/patients.json");
+        const data = await res.json();
+        setPatientsList(Array.isArray(data) ? data : []);
+        console.log(patient)
+      } catch (e) {
+        console.error("Failed to load patients.json", e);
       }
     })();
   }, []);
 
-  // Re-resolve practitioner once on mount (if global attaches late)
-  useEffect(() => {
-    setPractitioner((prev) => {
-      const resolved = resolveGlobalPractitioner();
-      if (!prev || prev.id !== resolved.id || prev.name !== resolved.name || prev.license !== resolved.license) {
-        return resolved;
-      }
-      return prev;
-    });
-  }, []);
-
-  // When user picks a patient from dropdown, populate the form fields
+  // When user picks a patient from dropdown, populate the form fields only (bundle stays the same)
   const handlePatientSelectFromList = (e) => {
     const idx = Number(e.target.value);
     setSelectedPatientIdx(idx);
@@ -245,22 +148,18 @@ export default function AppConsult() {
       setAbhaList([]);
       setSelectedAbha("");
       setSelectedAbhaNumber("");
-      setPatient((prev) => ({ ...prev, name: "", user_ref_id: "", user_id: "", phone: "", gender: "unknown", birthDate: "" }));
       return;
     }
-    const derivedMrn = p.user_ref_id || p.mrn || p.abha_ref || String(p.user_id || "");
-    const phone = p.mobile
-      ? String(p.mobile).startsWith("+") ? String(p.mobile) : `+91${p.mobile}`
-      : p.phone || "";
+    // Fill parts of the patient form (NOT touching MRN so your bundle shape stays same)
     setPatient((prev) => ({
       ...prev,
       name: p.name || "",
-      user_ref_id: derivedMrn,
-      user_id: String(p.user_id || ""),
-      phone,
+      phone: p.mobile ? (String(p.mobile).startsWith("+") ? String(p.mobile) : `+91${p.mobile}`) : "",
       gender: mapGender(p.gender),
-      birthDate: ddmmyyyyToISO(p.dob || p.birthDate || ""),
+      birthDate: ddmmyyyyToISO(p.dob),
+      user_ref_id: p.user_ref_id || p.user_id || "",
     }));
+    // ABHA UI
     const abhas = normalizeAbhaAddresses(p);
     setAbhaList(abhas);
     setSelectedAbha(abhas.length ? abhas[0].value : "");
@@ -304,6 +203,8 @@ export default function AppConsult() {
   const [successMsg, setSuccessMsg] = useState("");
 
   /* ----------------- Handlers ----------------- */
+  const handlePatientChange = (e) =>
+    setPatient({ ...patient, [e.target.name]: e.target.value });
   const handleCompositionChange = (e) =>
     setComposition({ ...composition, [e.target.name]: e.target.value });
   const handleConditionChange = (e) =>
@@ -333,15 +234,15 @@ export default function AppConsult() {
     // Accept only PDF/JPEG/PNG
     if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
       alert("Only PDF / JPG / PNG attachments allowed.");
-      if (fileRef.current) fileRef.current.value = "";
+      fileRef.current.value = "";
       setAttachmentBase64(null);
       setAttachmentMime(null);
       return;
     }
     const reader = new FileReader();
     reader.onload = function (e) {
-      const base64 = String(e.target.result || "").split(",")[1];
-      setAttachmentBase64(base64 || null);
+      const base64 = e.target.result.split(",")[1];
+      setAttachmentBase64(base64);
       setAttachmentMime(file.type);
     };
     reader.onerror = function () {
@@ -355,7 +256,7 @@ export default function AppConsult() {
   /* ----------------- Build Bundle ----------------- */
   function buildBundle() {
     // Basic front-end checks
-    if (!practitionerDisplayName || !practitionerLicense)
+    if (!practitioner.name || !practitioner.license)
       throw new Error("Practitioner name and license required.");
     if (!patient.name || !patient.user_ref_id || !patient.gender)
       throw new Error("Patient name, MRN and gender required.");
@@ -489,7 +390,10 @@ export default function AppConsult() {
       });
     }
 
-    const invNarr = makeSectionNarrative("Investigations / Advice", investigationsText);
+    const invNarr = makeSectionNarrative(
+      "Investigations / Advice",
+      investigationsText
+    );
     if (invNarr) {
       sections.push({
         title: "Investigations / Advice",
@@ -548,13 +452,13 @@ export default function AppConsult() {
           "https://nrces.in/ndhm/fhir/r4/StructureDefinition/ConsultationRecord",
         ],
       },
-      // text: {
-      //   status: "generated",
-      //   div: buildNarrative(
-      //     "Consultation Note",
-      //     `<p>${composition.title}</p><p>Date: ${composition.date}</p>`
-      //   ),
-      // },
+      text: {
+        status: "generated",
+        div: buildNarrative(
+          "Consultation Note",
+          `<p>${composition.title}</p><p>Date: ${composition.date}</p>`
+        ),
+      },
       language: "en-IN",
       identifier: { system: "https://ndhm.in/phr", value: uuidv4() },
       status: composition.status || "final",
@@ -573,26 +477,10 @@ export default function AppConsult() {
       author: [{ reference: `urn:uuid:${practitionerReferenceId}`, display: practitionerDisplayName }],
       title: composition.title,
       section: sections,
-    };
+    }; // keeps your existing shape.
 
-    /* Patient resource — enforce non-empty identifier value (string), or omit */
-    const mrnValue = patient.user_ref_id || patient.user_id || "";
-    const identifiers = [];
-    if (String(mrnValue).trim() !== "") {
-      identifiers.push({
-        type: {
-          coding: [
-            {
-              system: "http://terminology.hl7.org/CodeSystem/v2-0203",
-              code: "MR",
-              display: "Medical record number",
-            },
-          ],
-        },
-        system: "https://healthid.ndhm.gov.in",
-        value: String(mrnValue),
-      });
-    }
+    /* Patient resource */
+    const mrnValue = patient.user_ref_id || patient.user_id; // MRN preferred; fallback to user_id
     const patientResource = {
       resourceType: "Patient",
       id: patientId,
@@ -601,19 +489,33 @@ export default function AppConsult() {
           "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient",
         ],
       },
-      // text: {
-      //   status: "generated",
-      //   div: buildNarrative(
-      //     "Patient",
-      //     `<p>${patient.name}, DoB: ${patient.birthDate || ""}</p>`
-      //   ),
-      // },
-      identifier: identifiers.length ? identifiers : undefined,
-      name: patient.name ? [{ text: patient.name }] : [],
+      text: {
+        status: "generated",
+        div: buildNarrative(
+          "Patient",
+          `<p>${patient.name}, DoB: ${patient.birthDate || ""}</p>`
+        ),
+      },
+      identifier: [
+        {
+          type: {
+            coding: [
+              {
+                system: "http://terminology.hl7.org/CodeSystem/v2-0203",
+                code: "MR",
+                display: "Medical record number",
+              },
+            ],
+          },
+          system: "https://healthid.ndhm.gov.in",
+          value: mrnValue, // fixed: ensures non-empty value for validator
+        },
+      ],
+      name: [{ text: patient.name }],
       telecom: patient.phone
         ? [{ system: "phone", value: patient.phone, use: "home" }]
         : [],
-      gender: patient.gender || "unknown",
+      gender: patient.gender,
       birthDate: patient.birthDate || undefined,
     };
 
@@ -622,18 +524,13 @@ export default function AppConsult() {
       resourceType: "Practitioner",
       id: practitionerReferenceId,
       meta: { profile: ["https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner"] },
-      identifier: [{
-        type: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0203", code: "MD", display: "Medical License number" }] },
-        system: "https://doctor.ndhm.gov.in",
-        value: String(practitionerLicense),
-      }],
+      // text: { status: "generated", div: buildNarrative("Practitioner", `<p>${practitionerDisplayName}</p>`) },
+      identifier: [{ type: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/v2-0203", code: "MD", display: "Medical License number" }] }, system: "https://doctor.ndhm.gov.in", value: practitionerLicense }],
       name: [{ text: practitionerDisplayName }],
     };
 
     /* Chief complaints -> Condition resources */
     const chiefResources = chiefComplaints.map((cc, idx) => {
-      const codeText = cc.text ? String(cc.text).trim() : "";
-      const codeCode = cc.code ? String(cc.code).trim() : "";
       return {
         resourceType: "Condition",
         id: chiefIds[idx],
@@ -645,27 +542,27 @@ export default function AppConsult() {
         clinicalStatus: {
           coding: [
             {
-              system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              system:
+                "http://terminology.hl7.org/CodeSystem/condition-clinical",
               code: "active",
               display: "Active",
             },
           ],
         },
-        code:
-          codeText
-            ? (codeCode
-                ? {
-                    coding: [
-                      {
-                        system: "http://snomed.info/sct",
-                        code: codeCode,
-                        display: codeText,
-                      },
-                    ],
-                    text: codeText,
-                  }
-                : { text: codeText })
-            : undefined,
+        code: cc.text
+          ? cc.code && cc.code.trim() !== ""
+            ? {
+                coding: [
+                  {
+                    system: "http://snomed.info/sct",
+                    code: cc.code.trim(),
+                    display: cc.text,
+                  },
+                ],
+                text: cc.text,
+              }
+            : { text: cc.text }
+          : undefined,
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
       };
     });
@@ -682,7 +579,7 @@ export default function AppConsult() {
       status: "final",
       code: { text: "Physical examination" },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
-      valueString: ex.text || undefined,
+      valueString: ex.text,
     }));
 
     /* Allergy resources */
@@ -697,7 +594,8 @@ export default function AppConsult() {
       clinicalStatus: {
         coding: [
           {
-            system: "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+            system:
+              "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
             code: "active",
             display: "Active",
           },
@@ -709,9 +607,6 @@ export default function AppConsult() {
 
     /* MedicationStatement resources */
     const medResources = medications.map((m, idx) => {
-      const medText = m.medicationText ? String(m.medicationText).trim() : "";
-      const medCode = m.medicationCode ? String(m.medicationCode).trim() : "";
-      const noteText = m.note ? String(m.note).trim() : "";
       const medObj = {
         resourceType: "MedicationStatement",
         id: medIds[idx],
@@ -720,35 +615,33 @@ export default function AppConsult() {
             "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationStatement",
           ],
         },
-        // text: {
-        //   status: "generated",
-        //   div: buildNarrative(
-        //     "Medication",
-        //     `<p>${medText || "Medication"}${noteText ? ` - ${noteText}` : ""}</p>`
-        //   ),
-        // },
+        text: {
+          status: "generated",
+          div: buildNarrative(
+            "Medication",
+            `<p>${m.medicationText} - ${m.note || ""}</p>`
+          ),
+        },
         status: "active",
         medicationCodeableConcept:
-          medCode
+          m.medicationCode && m.medicationCode.trim() !== ""
             ? {
                 coding: [
                   {
                     system: "http://snomed.info/sct",
-                    code: medCode,
-                    display: medText || "Medication",
+                    code: m.medicationCode.trim(),
+                    display: m.medicationText,
                   },
                 ],
               }
-            : { text: medText || "Medication" },
+            : { text: m.medicationText },
         subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
-        ...(noteText ? { note: [{ text: noteText }] } : {}),
+        ...(m.note && m.note.trim() !== "" ? { note: [{ text: m.note.trim() }] } : {}),
       };
       return medObj;
     });
 
     /* Primary diagnosis (Condition) */
-    const conditionText = condition.text ? String(condition.text).trim() : "";
-    const conditionCode = condition.code ? String(condition.code).trim() : "";
     const conditionResource = {
       resourceType: "Condition",
       id: conditionId,
@@ -760,25 +653,26 @@ export default function AppConsult() {
       clinicalStatus: {
         coding: [
           {
-            system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
+            system:
+              "http://terminology.hl7.org/CodeSystem/condition-clinical",
             code: condition.clinicalStatus || "active",
             display: "Active",
           },
         ],
       },
       code:
-        conditionCode
+        condition.code && String(condition.code).trim() !== ""
           ? {
               coding: [
                 {
                   system: "http://snomed.info/sct",
-                  code: conditionCode,
-                  display: conditionText,
+                  code: condition.code.trim(),
+                  display: condition.text,
                 },
               ],
-              text: conditionText,
+              text: condition.text,
             }
-          : { text: conditionText },
+          : { text: condition.text },
       subject: { reference: `urn:uuid:${patientId}`, display: patient.name },
     };
 
@@ -818,7 +712,7 @@ export default function AppConsult() {
     setErrorMsg("");
     setSuccessMsg("");
 
-    if (!practitionerDisplayName || !practitionerLicense) {
+    if (!practitioner.name || !practitioner.license) {
       setErrorMsg("Practitioner name and license are mandatory.");
       return;
     }
@@ -837,18 +731,15 @@ export default function AppConsult() {
 
     try {
       const bundle = buildBundle();
-      const patientForPostRaw = patient.user_id;
-      const patientForPost = Number(patientForPostRaw);
-      const payloadPatient = Number.isFinite(patientForPost) ? patientForPost : String(patientForPostRaw || "");
-
-      axios.post("https://uat.discharge.org.in/api/v5/fhir-bundle", { bundle, patient: patientForPost })
+      console.log("JSON pushed on server:", bundle);
+      const patientForPost = patient.user_ref_id || patient.user_id; // MRN preferred; fallback to user_id
+      axios.post('https://uat.discharge.org.in/api/v5/fhir-bundle', { bundle, patient: patientForPost })
         .then(response => {
           console.log("FHIR Bundle Submitted:", response.data);
           alert("Submitted successfully");
         })
         .catch(error => {
-          console.error("Error submitting FHIR Bundle 2:", error.response?.data || error.message, { patient: payloadPatient });
-          console.log("failed to deliver but here is data", bundle, {patient: patientForPost} )
+          console.error("Error submitting FHIR Bundle:", error.response?.data || error.message, { patient: patientForPost });
           alert("Failed to submit FHIR Bundle. See console.");
         });
       setTimeout(() => setSuccessMsg(""), 4000);
@@ -884,15 +775,15 @@ export default function AppConsult() {
       <div className="card mb-3">
         <div className="card-header">2. Patient Info <span className="text-danger">*</span></div>
         <div className="card-body">
-          {/* Patient API dropdown */}
+          {/* Patient "API" dropdown */}
           <div className="row g-2 mb-2">
             <div className="col-md-8">
-              <label className="form-label">Select Patient (API first, fallback local)</label>
+              <label className="form-label">Select Patient (mock API)</label>
               <select className="form-select" value={selectedPatientIdx < 0 ? "" : String(selectedPatientIdx)} onChange={handlePatientSelectFromList}>
                 <option value="">-- Select patient --</option>
                 {patientsList.map((p, i) => (
-                  <option key={(p.user_ref_id || p.email || p.mobile || i) + "_opt"} value={i}>
-                    {p.name} — {p.mobile || p.email || "no mobile"}
+                  <option key={(p.user_id || p.email || p.mobile || i) + "_opt"} value={i}>
+                    {p.name} — {p.mobile || "no mobile"}
                   </option>
                 ))}
               </select>
@@ -906,7 +797,7 @@ export default function AppConsult() {
             </div>
             <div className="col-md-6">
               <label className="form-label">MRN <span className="text-danger">*</span></label>
-              <input name="user_ref_id" type="text" className="form-control" value={patient.user_ref_id} readOnly />
+              <input name="user_ref_id" type="text" className="form-control" value={patient.user_ref_id} readOnly  />
             </div>
 
             <div className="col-md-4 mt-2">
@@ -915,7 +806,7 @@ export default function AppConsult() {
             </div>
             <div className="col-md-4 mt-2">
               <label className="form-label">Gender <span className="text-danger">*</span></label>
-              <select name="gender" className="form-select" value={patient.gender} readOnly>
+              <select name="gender" className="form-select" value={patient.gender} readOnly >
                 <option value="">--Select--</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -925,7 +816,7 @@ export default function AppConsult() {
             </div>
             <div className="col-md-4 mt-2">
               <label className="form-label">Birth Date</label>
-              <input name="birthDate" type="date" className="form-control" value={patient.birthDate} readOnly />
+              <input name="birthDate" type="date" className="form-control" value={patient.birthDate} readOnly  />
             </div>
 
             {/* ABHA UI (not used in bundle; for operator convenience) */}
